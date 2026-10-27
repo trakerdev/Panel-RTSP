@@ -1,0 +1,22 @@
+[Unit]
+Description=Servicio de grabacion de frames RTSP Tapo
+After=network-online.target local-fs.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/local/bin/capturar_cams.sh
+Restart=always
+RestartSec=5
+
+# Prioridades de fondo (amable con CPU y disco)
+Nice=10
+IOSchedulingClass=idle
+
+# Aislamiento de núcleos y tope máximo para SBCs
+CPUAffinity=2,3
+CPUQuota=200%
+
+[Install]
+WantedBy=multi-user.target
