@@ -4,10 +4,13 @@ session_start([
     'cookie_samesite' => 'Lax'
 ]);
 
-// Configuración de credenciales predeterminadas
-define('AUTH_USER', 'admin');
-// Hash BCRYPT generado con password_hash('TuPassword', PASSWORD_BCRYPT)
-define('AUTH_PASS_HASH', '$2y$10$7R4dSmJ72r78UaA5tVw8zOQh2Y7c9m0H3f6b8D2u1K9v5M4L7w2pG');
+// Usuario web
+define('AUTH_USER', 'USUARIO_WEB');
+
+// Hash BCRYPT de la contraseña.
+// Genera tu hash con: php -r "echo password_hash('TU_CONTRASEÑA', PASSWORD_BCRYPT) . PHP_EOL;"
+// Hash de demostración correspondiente a la clave: 'CONTRASEÑA_WEB'
+define('AUTH_PASS_HASH', '$2y$10$fW3qZ4gO7G4XWjU12j4j3eWn6pWz5A1pD3tqXoXqE2H9lO9eG5Ayy');
 
 if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     $_SESSION = [];

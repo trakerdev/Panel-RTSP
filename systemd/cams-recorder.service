@@ -1,20 +1,17 @@
 [Unit]
-Description=Servicio de grabacion de frames RTSP Tapo
+Description=RTSP Cameras Snapshot Recorder
 After=network-online.target local-fs.target
 Wants=network-online.target
 
 [Service]
 Type=simple
 User=root
-ExecStart=/usr/local/bin/capturar_cams.sh
+ExecStart=/home/USUARIO/tareas/capturar_cams.sh
 Restart=always
 RestartSec=5
 
-# Prioridades de fondo (amable con CPU y disco)
+# Optimización para bajo consumo y aislamiento en CPUs multinúcleo
 Nice=10
-IOSchedulingClass=idle
-
-# Aislamiento de núcleos y tope máximo para SBCs
 CPUAffinity=2,3
 CPUQuota=200%
 

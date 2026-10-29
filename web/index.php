@@ -9,11 +9,9 @@ check_auth();
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Panel de Cámaras RTSP</title>
 
-  <!-- Bootstrap 5 CSS -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  
-  <!-- Google Material Symbols Outlined -->
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+  <!-- Dependencias CSS (se pueden usar locales o desde CDN) -->
+  <link href="bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="materialsymbolsoutlined.css" />
 
   <style>
     body {
@@ -42,7 +40,6 @@ check_auth();
       box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
     }
 
-    /* Proporción 16:9 ajustada para tomas de 640x360 */
     .viewport {
       position: relative;
       width: 100%;
@@ -116,7 +113,6 @@ check_auth();
       display: block;
     }
 
-    /* Componentes del Historial */
     .history-drawer {
       background-color: #161b22;
       border-top: 1px solid #30363d;
@@ -127,7 +123,7 @@ check_auth();
       display: flex;
       gap: 0.5rem;
       overflow-x: auto;
-      padding-bottom: 0.5rem;
+      padding-bottom: 0.35rem;
       scrollbar-width: thin;
     }
 
@@ -140,10 +136,10 @@ check_auth();
       border-radius: 4px;
     }
 
-    .btn-day {
+    .btn-item {
       white-space: nowrap;
       font-size: 0.8rem;
-      padding: 0.25rem 0.75rem;
+      padding: 0.2rem 0.65rem;
       border-radius: 2rem;
       border: 1px solid #30363d;
       background-color: #0d1117;
@@ -152,12 +148,12 @@ check_auth();
       transition: all 0.2s ease;
     }
 
-    .btn-day:hover {
+    .btn-item:hover {
       border-color: #58a6ff;
       color: #c9d1d9;
     }
 
-    .btn-day.active {
+    .btn-item.active {
       background-color: #1f6feb;
       border-color: #1f6feb;
       color: #ffffff;
@@ -196,7 +192,7 @@ check_auth();
       </div>
     </header>
 
-    <!-- Grid -->
+    <!-- Grid de cámaras -->
     <div class="row g-3 g-lg-4" id="camGrid"></div>
   </div>
 
@@ -228,15 +224,27 @@ check_auth();
             <img id="zoomModalImg" src="" alt="Cámara ampliada">
           </div>
 
+          <!-- Drawer de Historial -->
           <div class="history-drawer">
+            <!-- Selector de Días -->
             <div class="d-flex align-items-center gap-2 mb-2">
               <span class="material-symbols-outlined text-secondary fs-6">calendar_month</span>
-              <span class="small text-secondary fw-semibold">Días disponibles:</span>
-            </div>
-            <div class="days-scroll mb-3" id="daysList">
-              <span class="text-secondary small fst-italic">Buscando tomas archivadas...</span>
+              <span class="small text-secondary fw-semibold">Día:</span>
+              <div class="days-scroll flex-grow-1" id="daysList">
+                <span class="text-secondary small fst-italic">Buscando días...</span>
+              </div>
             </div>
 
+            <!-- Selector de Horas -->
+            <div class="d-flex align-items-center gap-2 mb-3">
+              <span class="material-symbols-outlined text-secondary fs-6">schedule</span>
+              <span class="small text-secondary fw-semibold">Hora:</span>
+              <div class="days-scroll flex-grow-1" id="hoursList">
+                <span class="text-secondary small fst-italic">Selecciona un día...</span>
+              </div>
+            </div>
+
+            <!-- Línea de Tiempo -->
             <div class="bg-black bg-opacity-50 p-2 rounded border border-secondary border-opacity-50">
               <div class="d-flex justify-content-between align-items-center mb-1">
                 <div class="d-flex align-items-center gap-2">
@@ -284,15 +292,17 @@ check_auth();
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- Bootstrap Bundle JS (Local o CDN) -->
+  <script src="bootstrap.bundle.min.js"></script>
 
   <script>
     const camGrid = document.getElementById('camGrid');
     const syncText = document.getElementById('syncText');
     const localStore = new Map();
 
+    // Referencias del Modal
     const zoomModalElem = document.getElementById('zoomModal');
-    const zoomModalInstance = new bootstrap.Modal(zoomModalElem);
+    const zoomModalInstance = (typeof bootstrap !== 'undefined' && bootstrap.Modal) ? new bootstrap.Modal(zoomModalElem) : null;
     const zoomModalTitle = document.getElementById('zoomModalTitle');
     const zoomModalBadge = document.getElementById('zoomModalBadge');
     const zoomModalImg = document.getElementById('zoomModalImg');
@@ -300,7 +310,9 @@ check_auth();
     const btnDownload = document.getElementById('btnDownloadFrame');
     const btnResumeLive = document.getElementById('btnResumeLive');
 
+    // Referencias del Historial
     const daysList = document.getElementById('daysList');
+    const hoursList = document.getElementById('hoursList');
     const timeSlider = document.getElementById('timeSlider');
     const timelineTime = document.getElementById('timelineTime');
     const timelineCounter = document.getElementById('timelineCounter');
@@ -314,16 +326,19 @@ check_auth();
     let isHistoryMode = false;
     let historyFrames = [];
     let selectedDate = '';
+    let selectedHour = '';
 
-    zoomModalElem.addEventListener('hidden.bs.modal', () => {
-      activeZoomCamId = null;
-      activeZoomRawSrc = '';
-      zoomModalImg.src = '';
-      isHistoryMode = false;
-      historyFrames = [];
-      btnResumeLive.classList.add('d-none');
-      btnResumeLive.classList.remove('d-flex');
-    });
+    if (zoomModalElem) {
+      zoomModalElem.addEventListener('hidden.bs.modal', () => {
+        activeZoomCamId = null;
+        activeZoomRawSrc = '';
+        zoomModalImg.src = '';
+        isHistoryMode = false;
+        historyFrames = [];
+        btnResumeLive.classList.add('d-none');
+        btnResumeLive.classList.remove('d-flex');
+      });
+    }
 
     btnResumeLive.addEventListener('click', () => {
       isHistoryMode = false;
@@ -340,31 +355,45 @@ check_auth();
       }
     });
 
-    async function cargarHistorial(camId, date = '') {
+    async function cargarHistorial(camId, date = '', hour = '') {
       try {
-        daysList.innerHTML = `<span class="text-secondary small fst-italic">Cargando días...</span>`;
-        const res = await fetch(`api_history.php?cam=${camId}&date=${date}&t=${Date.now()}`);
+        const res = await fetch(`api_history.php?cam=${camId}&date=${date}&hour=${hour}&t=${Date.now()}`);
         if (!res.ok) throw new Error('Error al consultar historial');
         const data = await res.json();
 
         selectedDate = data.selected_date;
+        selectedHour = data.selected_hour;
         historyFrames = data.frames || [];
 
+        // 1. Selector de días
         daysList.innerHTML = '';
-        if (data.days.length === 0) {
-          daysList.innerHTML = `<span class="text-secondary small">No hay historial disponible</span>`;
+        if (!data.days || data.days.length === 0) {
+          daysList.innerHTML = `<span class="text-secondary small">Sin historial disponible</span>`;
         } else {
           data.days.forEach(day => {
             const btn = document.createElement('button');
-            btn.className = `btn-day ${day === selectedDate ? 'active' : ''}`;
+            btn.className = `btn-item ${day === selectedDate ? 'active' : ''}`;
             btn.textContent = day;
-            btn.addEventListener('click', () => {
-              cargarHistorial(camId, day);
-            });
+            btn.addEventListener('click', () => cargarHistorial(camId, day, ''));
             daysList.appendChild(btn);
           });
         }
 
+        // 2. Selector de horas
+        hoursList.innerHTML = '';
+        if (!data.hours || data.hours.length === 0) {
+          hoursList.innerHTML = `<span class="text-secondary small">Sin tomas para este día</span>`;
+        } else {
+          data.hours.forEach(hr => {
+            const btn = document.createElement('button');
+            btn.className = `btn-item ${hr === selectedHour ? 'active' : ''}`;
+            btn.textContent = `${hr}:00`;
+            btn.addEventListener('click', () => cargarHistorial(camId, selectedDate, hr));
+            hoursList.appendChild(btn);
+          });
+        }
+
+        // 3. Slider de fotogramas
         if (historyFrames.length > 0) {
           timeSlider.disabled = false;
           timeSlider.min = 0;
@@ -378,7 +407,7 @@ check_auth();
           timelineCounter.textContent = 'Frame: 0 / 0';
         }
       } catch (e) {
-        daysList.innerHTML = `<span class="text-danger small">Error cargando historial</span>`;
+        daysList.innerHTML = `<span class="text-danger small">Error al conectar con la API</span>`;
       }
     }
 
@@ -493,7 +522,7 @@ check_auth();
       }
 
       cargarHistorial(cam.id);
-      zoomModalInstance.show();
+      if (zoomModalInstance) zoomModalInstance.show();
     }
 
     async function sincronizarCamaras() {
@@ -503,7 +532,7 @@ check_auth();
           window.location.href = 'login.php';
           return;
         }
-        if (!response.ok) throw new Error('Error HTTP');
+        if (!response.ok) throw new Error('Error al consultar api.php');
         const data = await response.json();
 
         syncText.textContent = `Actualizado: ${new Date().toLocaleTimeString()}`;
@@ -516,16 +545,18 @@ check_auth();
             col.id = `cam-col-${cam.id}`;
             col.className = 'col-12 col-md-6 col-lg-4 col-xxl-3';
 
+            const imagenSrc = cam.image ? `${cam.image}?t=${Date.now()}` : '';
+            const htmlImagen = cam.image 
+              ? `<img id="img-${cam.id}" src="${imagenSrc}" alt="${cam.name}">` 
+              : `<div class="text-secondary d-flex flex-column align-items-center justify-content-center h-100">
+                   <span class="material-symbols-outlined fs-1 text-secondary">videocam_off</span>
+                   <span class="small mt-1">Sin señal en vivo</span>
+                 </div>`;
+
             col.innerHTML = `
               <div class="cam-card shadow-sm h-100" id="card-${cam.id}">
                 <div class="viewport">
-                  ${cam.image 
-                    ? `<img id="img-${cam.id}" src="${cam.image}?t=${Date.now()}" alt="${cam.name}">` 
-                    : `<div class="text-secondary d-flex flex-column align-items-center">
-                         <span class="material-symbols-outlined fs-1 text-secondary">videocam_off</span>
-                         <span class="small mt-1">Sin captura previa</span>
-                       </div>`
-                  }
+                  ${htmlImagen}
                   <div class="cam-overlay">
                     <span id="badge-${cam.id}" class="status-badge ${cam.is_live ? 'bg-success bg-opacity-75 text-white is-live' : 'bg-danger bg-opacity-75 text-white'}">
                       <span class="pulse-dot"></span>
@@ -556,47 +587,48 @@ check_auth();
             return;
           }
 
+          // Actualizar Badge
           const badge = document.getElementById(`badge-${cam.id}`);
-          const label = badge.querySelector('.badge-label');
-          if (cam.is_live) {
-            badge.className = 'status-badge bg-success bg-opacity-75 text-white is-live';
-            label.textContent = 'EN VIVO';
-          } else {
-            badge.className = 'status-badge bg-danger bg-opacity-75 text-white';
-            label.textContent = 'ESTÁTICA';
+          if (badge) {
+            const label = badge.querySelector('.badge-label');
+            if (cam.is_live) {
+              badge.className = 'status-badge bg-success bg-opacity-75 text-white is-live';
+              if (label) label.textContent = 'EN VIVO';
+            } else {
+              badge.className = 'status-badge bg-danger bg-opacity-75 text-white';
+              if (label) label.textContent = 'ESTÁTICA';
+            }
           }
 
+          // Actualizar Timestamp
           const timeContainer = document.querySelector(`#time-${cam.id} span:last-child`);
           if (timeContainer && cam.mtime) {
             timeContainer.textContent = new Date(cam.mtime * 1000).toLocaleTimeString();
           }
 
-          if (activeZoomCamId === cam.id && !isHistoryMode) {
-            actualizarBadgeModal(cam.is_live);
-            if (cam.mtime) {
-              zoomModalTime.textContent = new Date(cam.mtime * 1000).toLocaleTimeString();
-            }
-          }
-
+          // Buffer de imagen anti-parpadeo
           const previous = localStore.get(cam.id);
           if (cam.image && (!previous || previous.mtime !== cam.mtime)) {
             const currentImg = document.getElementById(`img-${cam.id}`);
             const freshSrc = `${cam.image}?t=${Date.now()}`;
             
-            const buffer = new Image();
-            buffer.onload = () => {
-              if (currentImg) currentImg.src = freshSrc;
-              if (activeZoomCamId === cam.id && !isHistoryMode) {
-                activeZoomRawSrc = freshSrc;
-                zoomModalImg.src = freshSrc;
-              }
-            };
-            buffer.src = freshSrc;
+            if (currentImg) {
+              const buffer = new Image();
+              buffer.onload = () => {
+                currentImg.src = freshSrc;
+                if (activeZoomCamId === cam.id && !isHistoryMode) {
+                  activeZoomRawSrc = freshSrc;
+                  zoomModalImg.src = freshSrc;
+                }
+              };
+              buffer.src = freshSrc;
+            }
 
             localStore.set(cam.id, { mtime: cam.mtime, image: cam.image, is_live: cam.is_live, name: cam.name });
           }
         });
       } catch (err) {
+        console.error("Error en sincronización:", err);
         syncText.textContent = 'Reconectando con el servidor...';
       }
     }

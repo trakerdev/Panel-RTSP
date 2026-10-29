@@ -1,18 +1,15 @@
 #!/bin/bash
 # ==========================================
-# LIMPIEZA AUTOMÁTICA DE CAPTURAS > 30 DÍAS
+# LIMPIEZA AUTOMÁTICA DE DÍAS COMPLETOS > 30 DÍAS
 # ==========================================
-RUTA_BASE="/mnt/storage/cams"
+RUTA_BASE="/mnt/HDD/cams"
 
 if [ ! -d "$RUTA_BASE" ]; then
-  echo "$(date '+%Y-%m-%d %H:%M:%S') - Error: El directorio $RUTA_BASE no está accesible." >> /var/log/cams_cleanup.log
+  echo "$(date '+%Y-%m-%d %H:%M:%S') - Error: El directorio base $RUTA_BASE no está accesible." >> /var/log/cams_cleanup.log
   exit 1
 fi
 
-# Elimina archivos de imagen mayores a 30 días en subcarpetas
-find "$RUTA_BASE" -mindepth 2 -type f \( -name "*.jpg" -o -name "*.jpeg" -o -name "*.png" \) -mtime +30 -delete
+# Elimina directorios de días enteros (YYYY-MM-DD) con más de 30 días dentro de history/
+find "$RUTA_BASE"/*/history/* -maxdepth 0 -type d -mtime +30 -exec rm -rf {} +
 
-# Limpia directorios vacíos
-find "$RUTA_BASE" -mindepth 2 -type d -empty -delete
-
-echo "$(date '+%Y-%m-%d %H:%M:%S') - Purga de tomas mayores a 30 días completada." >> /var/log/cams_cleanup.log
+echo "$(date '+%Y-%m-%d %H:%M:%S') - Purga de historial completada en $RUTA_BASE." >> /var/log/cams_cleanup.log

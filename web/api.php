@@ -6,33 +6,30 @@ check_auth();
 date_default_timezone_set('America/Mexico_City');
 
 header('Content-Type: application/json');
-header('Cache-Control: no-cache, no-store, must-revalidate');
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 
 $baseDir = __DIR__;
-$cameras = [];
 $now = time();
 
-$dirs = array_filter(glob($baseDir . '/*'), 'is_dir');
+// Lista fija de cámaras para evitar lecturas recursivas de directorios
+$camaras_config = ['cam1', 'cam2', 'cam3', 'cam4'];
+$cameras = [];
 
-foreach ($dirs as $dir) {
-    $camName = basename($dir);
-    $files = glob($dir . '/*.{jpg,jpeg,png}', GLOB_BRACE);
+foreach ($camaras_config as $camName) {
+    $fullPath = $baseDir . '/' . $camName . '/live.jpg';
+    $webRelPath = $camName . '/live.jpg';
 
-    if (!empty($files)) {
-        usort($files, function($a, $b) {
-            return filemtime($b) - filemtime($a);
-        });
-
-        $latestFile = $files[0];
-        $mtime = filemtime($latestFile);
-        $diffSeconds = $now - $mtime;
+    if (file_exists($fullPath)) {
+        clearstatcache(true, $fullPath);
+        $mtime = @filemtime($fullPath) ?: 0;
+        $diffSeconds = abs($now - $mtime);
 
         $cameras[] = [
             'id'       => $camName,
             'name'     => ucfirst($camName),
-            'image'    => $camName . '/' . basename($latestFile),
+            'image'    => $webRelPath,
             'mtime'    => $mtime,
-            'is_live'  => ($diffSeconds <= 4)
+            'is_live'  => ($diffSeconds <= 5)
         ];
     } else {
         $cameras[] = [
