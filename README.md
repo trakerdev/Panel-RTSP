@@ -1,185 +1,128 @@
 # 📹 RTSP Snapshot Hub
 
-[![Linux](https://img.shields.io/badge/OS-Linux%20%2F%20Debian%20%2F%20Ubuntu-orange?logo=linux&logoColor=white)](#)
-[![FFmpeg](https://img.shields.io/badge/FFmpeg-Optimized%20RTSP-green?logo=ffmpeg&logoColor=white)](#)
-[![Nginx](https://img.shields.io/badge/Web%20Server-Nginx-009639?logo=nginx&logoColor=white)](#)
-[![PHP](https://img.shields.io/badge/Backend-PHP%208.x-777BB4?logo=php&logoColor=white)](#)
-[![Bootstrap](https://img.shields.io/badge/Frontend-Bootstrap%205-7952B3?logo=bootstrap&logoColor=white)](#)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](#)
+Un sistema autónomo, eficiente y ligero para el monitoreo en vivo y archivo histórico de cámaras IP mediante streaming RTSP (probado en cámaras TP-Link Tapo, compatible con cualquier flujo RTSP estándar).
 
-Sistema ligero y autohospedado para monitoreo de cámaras IP (Tapo, Ezviz o cualquier cámara compatible con RTSP). Diseñado para correr en servidores de bajo consumo (Single Board Computers como NanoPi, Raspberry Pi, Orange Pi o mini PCs x86) sin sobrecargar CPU ni memoria RAM.
-
-Captura un fotograma por segundo (`1 fps`), organiza tomas por directorios, detecta el estado en vivo o estático, permite zoom con descarga directa y ofrece una línea de tiempo horizontal interactiva con historial de 30 días protegido por autenticación segura.
+Diseñado específicamente para ejecutarse en computadoras monoplaca (SBC) como **NanoPi NEO3 / Raspberry Pi** con almacenamiento externo montado, logrando consumo mínimo de CPU ($O(1)$ en lecturas web y baja sobrecarga de inodos).
 
 ---
 
-## ✨ Características
+## 🚀 Características Principales
 
-* **Ultra Ligero:** Instancias de FFmpeg configuradas a 1 hilo (`-threads 1`), sin decodificación de audio (`-an`) y sin reescalados innecesarios sobre substreams H.264 (consumo total promedio: ~5% CPU en SBC ARM64).
-* **Grid Responsivo 16:9:** Interfaz en Bootstrap 5 adaptada a teléfonos móviles, tablets, pantallas ultrawide y modo pantalla completa.
-* **Detección Automática de Estado:** Identifica en tiempo real si una cámara está transmitiendo activamente (**EN VIVO**) o si la señal se detuvo (**ESTÁTICA** con el último fotograma capturado).
-* **Zoom & Historial por Día:** Modal de pantalla completa con selector de días e interactividad mediante slider horizontal para desplazarse cuadro por cuadro o saltar intervalos de tiempo.
-* **Descarga Inmediata:** Exportación con un clic del fotograma visible en resolución nativa JPG.
-* **Seguridad Integrada:** Sesiones seguras en PHP con contraseñas encriptadas mediante `password_hash()` (algoritmo BCRYPT).
-* **Mantenimiento Cero:** Script automatizado vía cron para purga rotativa de capturas que superen los 30 días.
+- **Tubería Dual FFmpeg:** Genera simultáneamente un fotograma en tiempo real (`live.jpg`) y una captura fechada histórica (`cam_HHMMSS.jpg`) sin decodificar el flujo dos veces.
+- **Jerarquía Modular Eficiente:** Almacena el historial en subdirectorios `history/YYYY-MM-DD/HH/`. Cada carpeta maneja máximo 3,600 fotogramas, evitando cuellos de botella en sistemas de archivos ext4.
+- **Consulta Web en Tiempo Real $O(1)$:** El endpoint `api.php` lee exclusivamente `live.jpg` en milisegundos, reduciendo el uso de PHP-FPM y CPU a ~0.1%.
+- **Historial con Navegación Rápida:** Visualizador web interactivo con selector de días, selector de horas y línea de tiempo cuadro a cuadro (+/-5 segundos).
+- **Aislamiento en Systemd:** Configurado para correr en núcleos dedicados (`CPUAffinity`) con prioridad de fondo (`Nice=10`).
+- **Autónomo y Off-Grid:** Preparado para trabajar con assets locales (Bootstrap 5 y Google Icons) sin depender de conexión a internet externa.
 
 ---
 
 ## 📂 Estructura del Repositorio
 
 ```text
-rtsp-snapshot-hub/
-├── scripts/
-│   ├── capturar_cams.sh      # Bucle de captura paralela persistente
-│   └── purgar_cams.sh        # Tarea de limpieza cronológica (30 días)
-├── web/
-│   ├── auth.php              # Control de sesión y comprobación de credenciales
-│   ├── login.php             # Pantalla de acceso responsiva
-│   ├── index.php             # Dashboard principal, modal de zoom y slider
-│   ├── api.php               # Endpoint JSON para escaneo de estado en vivo
-│   └── api_history.php       # Endpoint JSON para indexación de historial
-├── systemd/
-│   └── cams-recorder.service # Unidad systemd con afinidad de CPU y Nice I/O
-├── nginx/
-│   └── cams.conf             # Configuración de sitio para Nginx
-├── .gitignore
+├── README.md
 ├── LICENSE
-└── README.md
+├── .gitignore
+├── nginx/
+│   └── cams.conf                       # Configuración de Nginx y caché
+├── systemd/
+│   └── cams-recorder.service           # Servicio systemd con afinidad de núcleos
+├── scripts/
+│   ├── capturar_cams.sh                # Script Bash principal con loop de ffmpeg
+│   └── purgar_cams.sh                  # Script de limpieza automática (>30 días)
+└── web/
+    ├── index.php                       # Interfaz visual con grid y visor de historial
+    ├── login.php                       # Pantalla de inicio de sesión segura
+    ├── auth.php                        # Manejo de sesiones y protección con BCRYPT
+    ├── api.php                         # Endpoint liviano para estado en vivo
+    └── api_history.php                 # Endpoint modular para consulta por día y hora
 ```
 
 ---
 
-## 🚀 Guía de Instalación Rápida
+## ⚙️ Requisitos Previos
 
-### 1. Prerrequisitos del Sistema
-
-Instala los paquetes esenciales en tu servidor (Debian/Ubuntu):
-
-```bash
-sudo apt update
-sudo apt install -y ffmpeg nginx php-fpm php-cli git
-```
-
-### 2. Clonar el Repositorio
-
-```bash
-git clone https://github.com/TU_USUARIO/rtsp-snapshot-hub.git
-cd rtsp-snapshot-hub
-```
-
-### 3. Configurar Almacenamiento y Web
-
-Copia los archivos de la carpeta `web/` al directorio donde se guardarán las capturas (por ejemplo, en un disco montado o en `/mnt/storage/cams`):
-
-```bash
-sudo mkdir -p /mnt/storage/cams
-sudo cp -r web/* /mnt/storage/cams/
-sudo chown -R www-data:www-data /mnt/storage/cams
-sudo chmod -R 755 /mnt/storage/cams
-```
-
-### 4. Generar Credenciales
-
-Genera tu hash de contraseña seguro con el intérprete de PHP:
-
-```bash
-php -r "echo password_hash('TuPasswordSeguro', PASSWORD_BCRYPT) . PHP_EOL;"
-```
-
-Edita `/mnt/storage/cams/auth.php` y coloca tu usuario deseado junto con el hash obtenido:
-
-```php
-define('AUTH_USER', 'tu_usuario');
-define('AUTH_PASS_HASH', '$2y$10$TU_HASH_GENERADO_AQUI...');
-```
-
-> **Zona Horaria:** Ajusta tu zona horaria local en `api.php` y `api_history.php`:
-> ```php
-> date_default_timezone_set('America/Mexico_City');
-> ```
+- Sistema operativo Linux (Debian 12/13, Ubuntu Server o Armbian recomendados).
+- `ffmpeg` instalado: `sudo apt install ffmpeg`
+- Servidor web: `nginx` y `php-fpm` (PHP 8.x con soporte de sesiones).
+- Almacenamiento montado (ejemplo: `/mnt/HDD/cams`).
 
 ---
 
-## ⚙️ Configuración del Demonio de Captura
+## 🛠️ Instalación y Configuración
 
-### 1. Parámetros de Cámara en el Script
+### 1. Clonar o copiar los archivos
 
-Edita `scripts/capturar_cams.sh` con tus datos de red y cámaras:
+Copia los scripts y archivos web en las rutas correspondientes:
 
 ```bash
-USUARIO="tu_usuario_rtsp"
-PASSWORD="tu_password_rtsp"
-RUTA_BASE="/mnt/storage/cams"
+# Directorio para scripts
+mkdir -p /home/USUARIO/tareas
+cp scripts/* /home/USUARIO/tareas/
+chmod +x /home/USUARIO/tareas/*.sh
+
+# Directorio web de almacenamiento
+sudo mkdir -p /mnt/HDD/cams
+sudo cp web/* /mnt/HDD/cams/
+sudo chown -R www-data:www-data /mnt/HDD/cams
+sudo chmod -R 755 /mnt/HDD/cams
+```
+
+> **Nota:** Descarga localmente `bootstrap.min.css`, `bootstrap.bundle.min.js` y `materialsymbolsoutlined.css` dentro de `/mnt/HDD/cams/` si deseas operar 100% off-grid.
+
+### 2. Configurar credenciales y cámaras en `capturar_cams.sh`
+
+Edita `/home/USUARIO/tareas/capturar_cams.sh`:
+
+```bash
+USUARIO="USUARIO_RTSP"
+PASSWORD="CONTRASEÑA_RTSP"
+RUTA="/mnt/HDD/cams"
 
 CAMARAS=(
-  "exterior:192.168.1.100"
-  "sala:192.168.1.101"
-  "patio:192.168.1.102"
+  "exterior:192.168.100.1"
+  "interior:192.168.100.2"
+  "patio:192.168.100.3"
+  "cochera:192.168.100.4"
 )
 ```
 
-Mueve los scripts a `/usr/local/bin/` y asigna permisos de ejecución:
+### 3. Configurar contraseña de acceso web en `auth.php`
+
+Genera un hash BCRYPT para tu contraseña:
 
 ```bash
-sudo cp scripts/capturar_cams.sh /usr/local/bin/
-sudo cp scripts/purgar_cams.sh /usr/local/bin/
-sudo chmod +x /usr/local/bin/capturar_cams.sh /usr/local/bin/purgar_cams.sh
+php -r "echo password_hash('TU_CONTRASEÑA_AQUI', PASSWORD_BCRYPT) . PHP_EOL;"
 ```
 
-### 2. Levantar el Servicio con Systemd
+Abre `/mnt/HDD/cams/auth.php` y reemplaza:
 
-Copia el archivo de servicio incluido y actívalo:
+```php
+define('AUTH_USER', 'USUARIO_WEB');
+define('AUTH_PASS_HASH', '$2y$10$...HASH_GENERADO...');
+```
+
+### 4. Configurar el Servicio Systemd
+
+Copia la plantilla de servicio y habilítala:
 
 ```bash
 sudo cp systemd/cams-recorder.service /etc/systemd/system/
+sudo nano /etc/systemd/system/cams-recorder.service # Ajusta ruta si cambiaste de usuario
 sudo systemctl daemon-reload
 sudo systemctl enable --now cams-recorder.service
 ```
 
-Para verificar que esté corriendo y ver los hilos de captura:
+### 5. Configurar la Purga Automática en Cron
 
-```bash
-sudo systemctl status cams-recorder.service
-```
-
-### 3. Programar la Limpieza Automática (30 Días)
-
-Añade la tarea nocturna abriendo `sudo crontab -e`:
+Ejecuta `sudo crontab -e` y añade:
 
 ```cron
-30 3 * * * /usr/local/bin/purgar_cams.sh > /dev/null 2>&1
+30 3 * * * /home/USUARIO/tareas/purgar_cams.sh > /dev/null 2>&1
 ```
 
 ---
 
-## 🌐 Configuración de Nginx
+## 📄 Licencia
 
-Copia la plantilla incluida en `nginx/cams.conf` a `/etc/nginx/sites-available/cams`:
-
-```bash
-sudo cp nginx/cams.conf /etc/nginx/sites-available/cams
-sudo ln -s /etc/nginx/sites-available/cams /etc/nginx/sites-enabled/
-```
-
-Verifica la sintaxis y recarga el servidor web:
-
-```bash
-sudo nginx -t && sudo systemctl reload nginx
-```
-
----
-
-## 📊 Rendimiento y Hardware Recomendado
-
-| Recurso | Estimación (4 cámaras a 640x360 @ 1 fps) |
-|---|---|
-| **Uso de CPU** | 4% - 8% (Quad-Core ARM Cortex-A53 / x86) |
-| **Memoria RAM** | ~35 MB por proceso FFmpeg |
-| **Ancho de Banda LAN** | ~1.5 Mbps total (usando substream H.264) |
-| **Almacenamiento (30 días)** | ~75 GB a 90 GB por cámara (~300 GB total) |
-
----
-
-## 🛡️ Licencia
-
-Este proyecto está distribuido bajo la licencia MIT. Consulta el archivo [LICENSE](LICENSE) para más información.
+Distribuido bajo la Licencia MIT. Consulta el archivo `LICENSE` para más información.
